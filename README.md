@@ -71,16 +71,21 @@ git push origin v1.0
 
 The APK then appears on the repo's **Releases** page with a permanent download link you can share.
 
-## Updating the app
+## Updating the app (safe full sync)
 
-When you get a new `akshara.html`:
+Download the new `akshara-android.zip`, then replace everything except the git history:
 
 ```bash
-cp ~/storage/downloads/akshara.html app/src/main/assets/www/index.html
-# raise versionCode (and versionName) in app/build.gradle so Android accepts the update
-git add .
-git commit -m "Update Akshara"
-git push
+cd ~/downloads
+rm -rf akshara-new && mkdir akshara-new && cd akshara-new
+unzip -q ~/storage/downloads/akshara-android.zip
+cd ~/downloads/akshara-android
+find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+cp -r ~/downloads/akshara-new/akshara-android/. .
+git add -A && git commit -m "Update Akshara" && git push
+gh run watch
+rm -f app-debug.apk && gh run download --name akshara-apk
+cp app-debug.apk ~/storage/downloads/
 ```
 
 ## The camera scanner in the app
@@ -88,6 +93,19 @@ git push
 - **Take photo** opens the phone camera; **Choose photo** opens the gallery; **Live camera** shows a viewfinder. Android asks for camera permission the first time.
 - **Compare by eye** works fully offline: your photo above the Pallava, Pyu, Brahmi, Grantha, Khmer, Thai or Egyptian sign charts, with zoom.
 - **Read with Claude** needs internet and your own Anthropic API key (create one at console.anthropic.com). The key is stored only on your phone, and each scan is billed to your API account. Inside claude.ai the same button uses your Claude account instead, with no key.
+
+## The Pallava keyboard (works in every app)
+
+Version 3 adds **Akshara Pallava**, a real Android keyboard.
+
+1. Open Akshara → **Pallava** tab → **Enable keyboard**.
+   (Or: Settings → System → Languages & input → On-screen keyboard → Manage keyboards.)
+2. Switch on **Akshara Pallava**. Android shows a standard warning that keyboards can read what you type; this keyboard has no internet access of its own and stores nothing.
+3. In any text box, tap the keyboard switch icon (or the 🌐 key) and choose **Akshara Pallava**.
+
+Layout: page 1 has ka–ma in the traditional five-by-five order; the **ya…** key opens page 2 with ya–ha, ḷa, the ten vowels, virāma, ṃ, ḥ and daṇḍas. Vowel keys add a vowel sign after a consonant and a full vowel letter elsewhere. 🌐 switches back to your normal keyboard.
+
+The keyboard types standard Grantha Unicode. Inside Akshara it displays in the Pallava font; other apps show Grantha letters (or boxes if they have no Grantha font).
 
 ## Offline notes
 

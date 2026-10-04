@@ -8,6 +8,10 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.provider.Settings;
+import android.view.inputmethod.InputMethodInfo;
+import android.view.inputmethod.InputMethodManager;
+import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -115,10 +119,42 @@ public class MainActivity extends Activity {
             }
         });
 
+        web.addJavascriptInterface(new AndroidBridge(), "AksharaAndroid");
+
         if (savedInstanceState != null) {
             web.restoreState(savedInstanceState);
         } else {
             web.loadUrl(START_URL);
+        }
+    }
+
+    /** Lets the web app open keyboard settings and the keyboard picker. */
+    public class AndroidBridge {
+        @JavascriptInterface
+        public void openKeyboardSettings() {
+            runOnUiThread(() -> {
+                try {
+                    startActivity(new Intent(Settings.ACTION_INPUT_METHOD_SETTINGS));
+                } catch (ActivityNotFoundException ignored) { }
+            });
+        }
+
+        @JavascriptInterface
+        public void showKeyboardPicker() {
+            runOnUiThread(() -> {
+                InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                if (imm != null) imm.showInputMethodPicker();
+            });
+        }
+
+        @JavascriptInterface
+        public boolean isKeyboardEnabled() {
+            InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+            if (imm == null) return false;
+            for (InputMethodInfo info : imm.getEnabledInputMethodList()) {
+                if (getPackageName().equals(info.getPackageName())) return true;
+            }
+            return false;
         }
     }
 

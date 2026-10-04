@@ -10,13 +10,28 @@ android {
         applicationId "org.akshara.app"
         minSdk 24
         targetSdk 34
-        versionCode 1
-        versionName "1.0"
+        versionCode 5
+        versionName "4.1"
+    }
+
+    // One fixed key for every build, so new APKs install as updates
+    // instead of failing with "package conflicts with an existing package".
+    signingConfigs {
+        akshara {
+            storeFile file('akshara-debug.jks')
+            storePassword 'akshara-debug'
+            keyAlias 'akshara'
+            keyPassword 'akshara-debug'
+        }
     }
 
     buildTypes {
+        debug {
+            signingConfig signingConfigs.akshara
+        }
         release {
             minifyEnabled false
+            signingConfig signingConfigs.akshara
         }
     }
 

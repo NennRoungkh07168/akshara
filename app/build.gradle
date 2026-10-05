@@ -10,8 +10,8 @@ android {
         applicationId "org.akshara.app"
         minSdk 24
         targetSdk 34
-        versionCode 6
-        versionName "4.2"
+        versionCode 7
+        versionName "4.3"
     }
 
     // One fixed key for every build, so new APKs install as updates
@@ -44,4 +44,8 @@ android {
 dependencies {
     implementation 'androidx.webkit:webkit:1.11.0'
     implementation 'androidx.core:core:1.13.1'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
 }

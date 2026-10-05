@@ -37,7 +37,8 @@ public class PallavaKeyboard extends InputMethodService {
 
     // Characters in the Akshara Pallava font (traced from the Aksharamukha Pallava alphabet).
     // Everything else falls back to a Grantha font and is shown in gold.
-    private static final int[] IN_FONT = {0x11315, 0x11316, 0x11317, 0x11318, 0x11319, 0x1131A, 0x1131B,
+    private static final int[] IN_FONT = {0x11305, 0x11306, 0x11307, 0x11308, 0x11309, 0x1130F, 0x11310,
+            0x11313, 0x11314, 0x11315, 0x11316, 0x11317, 0x11318, 0x11319, 0x1131A, 0x1131B,
             0x1131C, 0x1131D, 0x1131E, 0x1131F, 0x11320, 0x11321, 0x11322, 0x11323, 0x11324, 0x11325,
             0x11326, 0x11327, 0x11328, 0x1132A, 0x1132B, 0x1132C, 0x1132D, 0x1132E, 0x1132F, 0x11330,
             0x11332, 0x11335, 0x11336, 0x11337, 0x11338, 0x11339};
@@ -63,9 +64,23 @@ public class PallavaKeyboard extends InputMethodService {
 
     private static final int VIRAMA = 0x1134D, ANUSVARA = 0x11302, VISARGA = 0x11303;
 
+    // Egyptian page: the 25 single-consonant signs plus common word signs and determinatives.
+    private static final String[] EG_SIGNS = {
+            "𓄿", "𓇋", "𓇌", "𓂝", "𓅱", "𓃀",
+            "𓊪", "𓆑", "𓅓", "𓈖", "𓂋", "𓉔",
+            "𓎛", "𓐍", "𓄡", "𓋴", "𓊃", "𓈙",
+            "𓈎", "𓎡", "𓎼", "𓏏", "𓍿", "𓂧",
+            "𓆓", "𓋹", "𓊹", "𓇓", "𓀀", "𓁐"};
+    private static final String[] EG_LAT = {
+            "ꜣ", "j", "y", "ꜥ", "w", "b",
+            "p", "f", "m", "n", "r", "h",
+            "ḥ", "ḫ", "ẖ", "s", "z", "š",
+            "q", "k", "g", "t", "ṯ", "d",
+            "ḏ", "ꜥnḫ", "nṯr", "nswt", "man", "woman"};
+
     private Typeface pallava;
     private LinearLayout root;
-    private boolean page2 = false;
+    private int page = 0; // 0: ka–ma, 1: ya–ha + vowels, 2: Egyptian hieroglyphs
     private EditorInfo editorInfo;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Runnable repeater;
@@ -94,7 +109,7 @@ public class PallavaKeyboard extends InputMethodService {
     public void onStartInputView(EditorInfo info, boolean restarting) {
         super.onStartInputView(info, restarting);
         editorInfo = info;
-        if (!restarting) page2 = false;
+        if (!restarting) page = 0;
         if (root != null) build();
     }
 
@@ -102,11 +117,21 @@ public class PallavaKeyboard extends InputMethodService {
 
     private void build() {
         root.removeAllViews();
-        if (!page2) {
+        if (page == 0) {
             for (int r = 0; r < PAGE1_CP.length; r++) {
                 LinearLayout row = newRow();
                 for (int c = 0; c < PAGE1_CP[r].length; c++) {
                     addCharKey(row, PAGE1_CP[r][c], PAGE1_LAT[r][c], 1f);
+                }
+                root.addView(row);
+            }
+        } else if (page == 2) {
+            for (int r = 0; r < 5; r++) {
+                LinearLayout row = newRow();
+                for (int c = 0; c < 6; c++) {
+                    final String sign = EG_SIGNS[r * 6 + c];
+                    View k = addKey(row, sign, EG_LAT[r * 6 + c], FG, 1f, v -> commit(sign));
+                    ((TextView) ((LinearLayout) k).getChildAt(0)).setTypeface(Typeface.DEFAULT);
                 }
                 root.addView(row);
             }
@@ -147,10 +172,13 @@ public class PallavaKeyboard extends InputMethodService {
         }
 
         LinearLayout ctrl = newRow();
-        addKey(ctrl, page2 ? cp(0x11315) + "…" : cp(0x1132F) + "…", page2 ? "ka–ma" : "ya–ha, vowels", FG, 1.4f, v -> {
-            page2 = !page2;
+        String nextLabel = page == 0 ? cp(0x1132F) + "…" : page == 1 ? "𓂀" : cp(0x11315) + "…";
+        String nextLatin = page == 0 ? "ya–ha, vowels" : page == 1 ? "hieroglyphs" : "Pallava ka–ma";
+        View pk = addKey(ctrl, nextLabel, nextLatin, FG, 1.4f, v -> {
+            page = (page + 1) % 3;
             build();
         });
+        if (page == 1) ((TextView) ((LinearLayout) pk).getChildAt(0)).setTypeface(Typeface.DEFAULT);
         addKey(ctrl, "🌐", "keyboards", FG, 1f, v -> {
             InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
             if (imm != null) imm.showInputMethodPicker();

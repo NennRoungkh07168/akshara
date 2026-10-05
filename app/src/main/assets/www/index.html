@@ -507,6 +507,7 @@ tr.clickable:hover td{background:var(--sunk)}
       <button class="btn primary" id="anGo">Analyse in 5 languages</button>
       <button class="btn" id="anStop" hidden>Stop</button>
     </div>
+    <div class="note" id="anOffNote" hidden>This app works completely offline and never connects to the internet. Translation and analysis use the built-in dictionary and grammar rules, word by word.</div>
     <div id="anDict"></div>
     <div id="anKeyBox" class="note" hidden>
       <p style="margin:.1rem 0 .5rem"><b>Full translation and analysis need Claude.</b> The offline dictionary above works without it. You have two options:</p>
@@ -1160,6 +1161,7 @@ tr.clickable:hover td{background:var(--sunk)}
       <li>Translate from any of the five languages into Sanskrit (shown in Pallava script) or Egyptian (shown in hieroglyphs), with word-by-word glosses and back-translations; a hieroglyph writer with transliteration input, lexicon spellings and a sign palette; the 9 Pallava independent vowels added to the font.</li>
       <li>Lexicon: 102 entries (Sanskrit and Tamil of Pallava inscriptions, Pyramid Texts vocabulary, royal titles and grammar words) with meanings in all five languages, grammatical use, Khmer descendants, and grammar guides for both languages.</li>
       <li>Pallava writer: the Akshara Pallava font (all 33 consonants, traced from the Aksharamukha Pallava alphabet), Grantha Unicode encoding, transliteration input, on-screen keyboard, copy and font download.</li>
+      <li>Offline translator: 82 core words in all seven languages (German, English, Arabic, Chinese, Khmer, Sanskrit, Egyptian with hieroglyphs), with Sanskrit verb person endings and Egyptian verb-first order with suffix pronouns; reverse reading from Sanskrit or Egyptian into the five languages. The Android app is offline-only: no internet permission.</li>
       <li>Aksharamukha compatibility: Pallava encoded in Javanese Unicode exactly as Aksharamukha does, displayed with a user-loaded Purnawarman font (full vowel signs and conjuncts); Javanese output; exact Aksharamukha check through its public API in the Android app.</li>
       <li>A camera scanner: Claude reads photos of writing in any of the app's scripts and translates them into all five languages, plus offline compare-by-eye charts and a scan history.</li>
       <li>An Egypt section: language history, 70+ signs, quiz, grammar, name and number writer, pyramids, Pyramid Texts, art and sculpture.</li>
@@ -1759,6 +1761,9 @@ Reply with ONLY one JSON object:
 let anCtl=null;
 async function runAnalyse(text,lang){
   text=(text||"").trim();if(!text){toast("Enter some text first.");return}
+  if(OFFLINE||(!inClaude&&!getKey())){$("#anKeyBox").hidden=true;$("#anStatus").textContent="";
+    const ancient=/Egyptian|Sanskrit|Pali|Old Khmer|Tamil/.test(lang)||/[ꜣꜥḥḫẖšṯḏāīūṛṣṭḍṇñśṅ\u{11300}-\u{1137F}]/u.test(text);
+    if(ancient)renderReverse(offlineReverse(text),$("#anOut"));else renderGloss7(text,$("#anOut"));return}
   if(text.length>4000){toast("Please analyse up to about 4,000 characters at a time.");return}
   $("#anOut").innerHTML="";$("#anKeyBox").hidden=true;
   anCtl=new AbortController();$("#anGo").disabled=true;$("#anStop").hidden=false;
@@ -2002,6 +2007,7 @@ $("#anDict").addEventListener("click",e=>{const b=e.target.closest("[data-lx]");
   if(b.dataset.a==="pal"){showTab("pallava");palSetFromText(latinToGrantha(lexWord(x).toLowerCase()),true)}else if(b.dataset.a==="km")speak(x.m.km,"km");else sendToAnalyse(x.cat==="ta"?x.script:x.tr,x.cat.startsWith("sa")?"Sanskrit (as in Pallava and early Southeast Asian inscriptions)":"Old or Middle Egyptian (transliteration or hieroglyphs)")});
 async function runCompose(text,tk){
   text=(text||"").trim();if(!text){toast("Enter some text first.");return}
+  if(OFFLINE||(!inClaude&&!getKey())){$("#anDict").innerHTML="";$("#anKeyBox").hidden=true;$("#anStatus").textContent="";renderOffline(offlineTranslate(text,tk),tk,$("#anOut"));return}
   renderDict(text);
   $("#anOut").innerHTML="";$("#anKeyBox").hidden=true;
   anCtl=new AbortController();$("#anGo").disabled=true;$("#anStop").hidden=false;
@@ -2241,6 +2247,109 @@ document.getElementById("fontPick").addEventListener("change",async e=>{
   else toast("That file couldn't be used as a font. Choose a .ttf or .otf file.");
   palEngineUI();palRender();lexRender();if(typeof tlRun==="function")tlRun();
 });
+
+// ===== OFFLINE TRANSLATOR (no internet, no AI) =====
+const CONC=[{"en": ["I", "me", "my"], "de": ["ich", "mich", "mir", "mein", "meine"], "ar": ["أنا", "انا"], "zh": ["我"], "km": ["ខ្ញុំ"], "sa": "aham", "eg": "jnk", "egh": "𓇋𓈖𓎡", "note": "Sanskrit: aham (I). Egyptian: jnk (stressed I); in sentences usually the suffix .j"}, {"en": ["you"], "de": ["du", "dich", "dir", "sie"], "ar": ["أنت", "انت"], "zh": ["你", "您"], "km": ["អ្នក"], "sa": "tvam", "eg": "ntk", "egh": "𓈖𓏏𓎡", "note": ""}, {"en": ["he", "him", "his"], "de": ["er", "ihn", "ihm", "sein"], "ar": ["هو"], "zh": ["他"], "km": ["គាត់"], "sa": "saḥ", "eg": "ntf", "egh": "𓈖𓏏𓆑", "note": ""}, {"en": ["she", "her"], "de": ["sie"], "ar": ["هي"], "zh": ["她"], "km": ["នាង"], "sa": "sā", "eg": "nts", "egh": "𓈖𓏏𓋴", "note": ""}, {"en": ["we", "us"], "de": ["wir", "uns"], "ar": ["نحن"], "zh": ["我们"], "km": ["យើង"], "sa": "vayam", "eg": "jnn", "egh": "𓇋𓈖𓈖", "note": ""}, {"en": ["king"], "de": ["könig", "königs"], "ar": ["ملك", "الملك"], "zh": ["国王", "王"], "km": ["ស្តេច"], "sa": "rājā", "eg": "nswt", "egh": "𓇓𓏏𓈖", "note": ""}, {"en": ["god", "gods"], "de": ["gott", "götter", "göttern"], "ar": ["إله", "الإله", "آلهة"], "zh": ["神", "众神"], "km": ["ព្រះ"], "sa": "devaḥ", "eg": "nṯr", "egh": "𓊹", "note": ""}, {"en": ["goddess"], "de": ["göttin"], "ar": ["إلهة"], "zh": ["女神"], "km": ["ទេពធីតា"], "sa": "devī", "eg": "nṯrt", "egh": "𓊹𓏏", "note": ""}, {"en": ["man", "men", "person"], "de": ["mann", "mensch", "männer"], "ar": ["رجل", "إنسان"], "zh": ["男人", "人"], "km": ["បុរស", "មនុស្ស"], "sa": "naraḥ", "eg": "z", "egh": "𓊃𓀀", "note": ""}, {"en": ["woman", "women"], "de": ["frau", "frauen"], "ar": ["امرأة", "المرأة"], "zh": ["女人", "妇女"], "km": ["ស្ត្រី"], "sa": "strī", "eg": "ḥmt", "egh": "𓈞𓏏𓁐", "note": ""}, {"en": ["child", "children"], "de": ["kind", "kinder"], "ar": ["طفل", "أطفال"], "zh": ["孩子"], "km": ["កូន", "ក្មេង"], "sa": "bālaḥ", "eg": "ẖrd", "egh": "𓄡𓂋𓂧𓀔", "note": ""}, {"en": ["son"], "de": ["sohn"], "ar": ["ابن"], "zh": ["儿子"], "km": ["កូនប្រុស"], "sa": "putraḥ", "eg": "sꜣ", "egh": "𓅭𓀀", "note": ""}, {"en": ["daughter"], "de": ["tochter"], "ar": ["ابنة", "بنت"], "zh": ["女儿"], "km": ["កូនស្រី"], "sa": "putrī", "eg": "sꜣt", "egh": "𓅭𓏏𓁐", "note": ""}, {"en": ["father"], "de": ["vater"], "ar": ["أب", "والد"], "zh": ["父亲", "爸爸"], "km": ["ឪពុក"], "sa": "pitā", "eg": "jt", "egh": "𓇋𓏏𓆑", "note": ""}, {"en": ["mother"], "de": ["mutter"], "ar": ["أم", "والدة"], "zh": ["母亲", "妈妈"], "km": ["ម្តាយ"], "sa": "mātā", "eg": "mwt", "egh": "𓅐𓏏", "note": ""}, {"en": ["brother"], "de": ["bruder"], "ar": ["أخ"], "zh": ["兄弟", "哥哥", "弟弟"], "km": ["បងប្រុស", "ប្អូនប្រុស"], "sa": "bhrātā", "eg": "sn", "egh": "𓌢𓈖𓀀", "note": ""}, {"en": ["sister"], "de": ["schwester"], "ar": ["أخت"], "zh": ["姐妹", "姐姐", "妹妹"], "km": ["បងស្រី", "ប្អូនស្រី"], "sa": "svasā", "eg": "snt", "egh": "𓌢𓈖𓏏𓁐", "note": ""}, {"en": ["house", "home"], "de": ["haus", "heim", "zuhause"], "ar": ["بيت", "منزل"], "zh": ["房子", "家"], "km": ["ផ្ទះ"], "sa": "gṛham", "eg": "pr", "egh": "𓉐𓏤", "note": ""}, {"en": ["temple"], "de": ["tempel"], "ar": ["معبد"], "zh": ["神庙", "寺庙"], "km": ["ប្រាសាទ", "វត្ត"], "sa": "devālayaḥ", "eg": "ḥwt-nṯr", "egh": "𓊹𓉗", "note": ""}, {"en": ["water"], "de": ["wasser"], "ar": ["ماء"], "zh": ["水"], "km": ["ទឹក"], "sa": "jalam", "eg": "mw", "egh": "𓈗", "note": ""}, {"en": ["sun"], "de": ["sonne"], "ar": ["شمس"], "zh": ["太阳"], "km": ["ព្រះអាទិត្យ"], "sa": "sūryaḥ", "eg": "rꜥ", "egh": "𓂋𓂝𓇳", "note": ""}, {"en": ["moon"], "de": ["mond"], "ar": ["قمر"], "zh": ["月亮"], "km": ["ព្រះចន្ទ"], "sa": "candraḥ", "eg": "jꜥḥ", "egh": "𓇋𓂝𓎛𓇹", "note": ""}, {"en": ["star", "stars"], "de": ["stern", "sterne"], "ar": ["نجم", "نجوم"], "zh": ["星星", "星"], "km": ["ផ្កាយ"], "sa": "tārā", "eg": "sbꜣ", "egh": "𓋴𓃀𓄿𓇼", "note": ""}, {"en": ["sky", "heaven"], "de": ["himmel"], "ar": ["سماء"], "zh": ["天空", "天"], "km": ["មេឃ"], "sa": "ākāśaḥ", "eg": "pt", "egh": "𓊪𓏏𓇯", "note": ""}, {"en": ["earth", "land"], "de": ["erde", "land"], "ar": ["أرض"], "zh": ["大地", "土地"], "km": ["ផែនដី", "ដី"], "sa": "bhūmiḥ", "eg": "tꜣ", "egh": "𓇾𓏤", "note": ""}, {"en": ["river"], "de": ["fluss"], "ar": ["نهر"], "zh": ["河"], "km": ["ទន្លេ"], "sa": "nadī", "eg": "jtrw", "egh": "𓇋𓏏𓂋𓅱𓈗", "note": ""}, {"en": ["life"], "de": ["leben"], "ar": ["حياة"], "zh": ["生命"], "km": ["ជីវិត"], "sa": "jīvanam", "eg": "ꜥnḫ", "egh": "𓋹", "note": ""}, {"en": ["death"], "de": ["tod"], "ar": ["موت"], "zh": ["死亡"], "km": ["សេចក្តីស្លាប់"], "sa": "mṛtyuḥ", "eg": "mwt", "egh": "𓅓𓏏𓀐", "note": ""}, {"en": ["truth", "justice"], "de": ["wahrheit", "gerechtigkeit"], "ar": ["حق", "الحق", "عدل"], "zh": ["真理", "正义"], "km": ["សេចក្តីពិត", "យុត្តិធម៌"], "sa": "satyam", "eg": "mꜣꜥt", "egh": "𓆄", "note": ""}, {"en": ["love"], "de": ["liebe"], "ar": ["حب"], "zh": ["爱情", "爱"], "km": ["សេចក្តីស្រឡាញ់"], "sa": "prema", "eg": "mrwt", "egh": "𓌸𓂋𓅱𓏏", "note": ""}, {"en": ["peace"], "de": ["frieden"], "ar": ["سلام"], "zh": ["和平"], "km": ["សន្តិភាព"], "sa": "śāntiḥ", "eg": "ḥtp", "egh": "𓊵𓏏𓊪", "note": ""}, {"en": ["heart"], "de": ["herz"], "ar": ["قلب"], "zh": ["心"], "km": ["បេះដូង", "ចិត្ត"], "sa": "hṛdayam", "eg": "jb", "egh": "𓄣", "note": ""}, {"en": ["eye"], "de": ["auge"], "ar": ["عين"], "zh": ["眼睛"], "km": ["ភ្នែក"], "sa": "netram", "eg": "jrt", "egh": "𓁹𓏏", "note": ""}, {"en": ["name"], "de": ["name", "namen"], "ar": ["اسم"], "zh": ["名字"], "km": ["ឈ្មោះ"], "sa": "nāma", "eg": "rn", "egh": "𓂋𓈖", "note": ""}, {"en": ["word", "words", "speech"], "de": ["wort", "worte", "rede"], "ar": ["كلمة", "كلام"], "zh": ["话", "词"], "km": ["ពាក្យ"], "sa": "vacanam", "eg": "mdw", "egh": "𓌃𓂧𓅱", "note": ""}, {"en": ["language", "tongue"], "de": ["sprache"], "ar": ["لغة"], "zh": ["语言"], "km": ["ភាសា"], "sa": "bhāṣā", "eg": "r", "egh": "𓂋𓏤", "note": "Egyptian r 'mouth' also means speech or language: r n Kmt 'the language of Egypt'."}, {"en": ["day"], "de": ["tag"], "ar": ["يوم"], "zh": ["天", "日"], "km": ["ថ្ងៃ"], "sa": "dinam", "eg": "hrw", "egh": "𓉔𓂋𓅱𓇳", "note": ""}, {"en": ["night"], "de": ["nacht"], "ar": ["ليل", "ليلة"], "zh": ["夜", "晚上"], "km": ["យប់"], "sa": "rātriḥ", "eg": "grḥ", "egh": "𓎼𓂋𓎛𓇰", "note": ""}, {"en": ["year"], "de": ["jahr"], "ar": ["سنة", "عام"], "zh": ["年"], "km": ["ឆ្នាំ"], "sa": "varṣam", "eg": "rnpt", "egh": "𓆳𓏏", "note": ""}, {"en": ["good", "beautiful"], "de": ["gut", "schön"], "ar": ["جيد", "جميل"], "zh": ["好", "美"], "km": ["ល្អ"], "sa": "sādhu", "eg": "nfr", "egh": "𓄤", "note": ""}, {"en": ["great", "big"], "de": ["groß", "gross"], "ar": ["عظيم", "كبير"], "zh": ["伟大", "大"], "km": ["ធំ"], "sa": "mahat", "eg": "ꜥꜣ", "egh": "𓉻", "note": ""}, {"en": ["eternal", "forever", "eternity"], "de": ["ewig", "ewigkeit"], "ar": ["أبدي", "أبدا"], "zh": ["永远", "永恒"], "km": ["ជារៀងរហូត", "អមតៈ"], "sa": "nityam", "eg": "ḏt", "egh": "𓆓𓏏𓇾", "note": ""}, {"en": ["all", "every"], "de": ["alle", "alles", "jeder"], "ar": ["كل"], "zh": ["所有", "每"], "km": ["ទាំងអស់"], "sa": "sarvam", "eg": "nb", "egh": "𓎟", "note": ""}, {"en": ["speak", "speaks", "say", "says", "said", "talk"], "de": ["sprechen", "spreche", "sprichst", "spricht", "sagen", "sage", "sagt"], "ar": ["يتكلم", "أتكلم", "يقول", "أقول"], "zh": ["说", "讲"], "km": ["និយាយ"], "sa": "vadati", "eg": "ḏd", "egh": "𓆓𓂧𓀁", "note": "Sanskrit vadati = 'speaks' (vadāmi = 'I speak'). Egyptian ḏd = 'to say'."}, {"en": ["give", "gives", "gave", "given"], "de": ["geben", "gebe", "gibt", "gab"], "ar": ["يعطي", "أعطى", "أعطي"], "zh": ["给"], "km": ["ឲ្យ", "អោយ"], "sa": "dadāti", "eg": "rdj", "egh": "𓂋𓂞", "note": ""}, {"en": ["see", "sees", "saw"], "de": ["sehen", "sehe", "sieht", "sah"], "ar": ["يرى", "أرى", "رأى"], "zh": ["看见", "看"], "km": ["ឃើញ", "មើល"], "sa": "paśyati", "eg": "mꜣꜣ", "egh": "𓌳𓁹", "note": ""}, {"en": ["hear", "hears", "heard", "listen"], "de": ["hören", "höre", "hört"], "ar": ["يسمع", "أسمع"], "zh": ["听"], "km": ["ស្តាប់"], "sa": "śṛṇoti", "eg": "sḏm", "egh": "𓄔𓅓", "note": ""}, {"en": ["go", "goes", "went"], "de": ["gehen", "gehe", "geht", "ging"], "ar": ["يذهب", "أذهب"], "zh": ["去", "走"], "km": ["ទៅ"], "sa": "gacchati", "eg": "šm", "egh": "𓈝𓂻", "note": ""}, {"en": ["come", "comes", "came"], "de": ["kommen", "komme", "kommt", "kam"], "ar": ["يأتي", "آتي"], "zh": ["来"], "km": ["មក"], "sa": "āgacchati", "eg": "jj", "egh": "𓇍", "note": ""}, {"en": ["eat", "eats", "ate"], "de": ["essen", "esse", "isst", "aß"], "ar": ["يأكل", "آكل"], "zh": ["吃"], "km": ["ញ៉ាំ", "ស៊ី", "បរិភោគ"], "sa": "khādati", "eg": "wnm", "egh": "𓃹𓈖𓅓𓀁", "note": ""}, {"en": ["drink", "drinks", "drank"], "de": ["trinken", "trinke", "trinkt"], "ar": ["يشرب", "أشرب"], "zh": ["喝"], "km": ["ផឹក"], "sa": "pibati", "eg": "swr", "egh": "𓋴𓅱𓂋𓀁", "note": ""}, {"en": ["live", "lives", "lived"], "de": ["leben", "lebe", "lebt"], "ar": ["يعيش", "أعيش"], "zh": ["活", "生活"], "km": ["រស់"], "sa": "jīvati", "eg": "ꜥnḫ", "egh": "𓋹", "note": ""}, {"en": ["die", "dies", "died"], "de": ["sterben", "stirbt", "starb"], "ar": ["يموت", "مات"], "zh": ["死"], "km": ["ស្លាប់"], "sa": "mriyate", "eg": "mt", "egh": "𓅓𓏏𓀐", "note": ""}, {"en": ["love", "loves", "loved"], "de": ["lieben", "liebe", "liebt"], "ar": ["يحب", "أحب"], "zh": ["爱"], "km": ["ស្រឡាញ់"], "sa": "snihyati", "eg": "mrj", "egh": "𓌸𓂋𓇋", "note": ""}, {"en": ["write", "writes", "wrote"], "de": ["schreiben", "schreibe", "schreibt"], "ar": ["يكتب", "أكتب"], "zh": ["写"], "km": ["សរសេរ"], "sa": "likhati", "eg": "sš", "egh": "𓏞", "note": ""}, {"en": ["read", "reads"], "de": ["lesen", "lese", "liest"], "ar": ["يقرأ", "أقرأ"], "zh": ["读"], "km": ["អាន"], "sa": "paṭhati", "eg": "šdj", "egh": "𓈙𓂧𓇋", "note": ""}, {"en": ["know", "knows", "knew"], "de": ["wissen", "weiß", "kennen"], "ar": ["يعرف", "أعرف"], "zh": ["知道"], "km": ["ដឹង", "ស្គាល់"], "sa": "jānāti", "eg": "rḫ", "egh": "𓂋𓐍", "note": ""}, {"en": ["learn", "learns", "teach"], "de": ["lernen", "lerne", "lernt", "lehren"], "ar": ["يتعلم", "أتعلم", "يعلم"], "zh": ["学习", "学"], "km": ["រៀន", "បង្រៀន"], "sa": "śikṣate", "eg": "sbꜣ", "egh": "𓋴𓃀𓄿𓀜", "note": "Egyptian sbꜣ means both 'teach' and 'learn'."}, {"en": ["teacher"], "de": ["lehrer", "lehrerin"], "ar": ["معلم", "مدرس"], "zh": ["老师"], "km": ["គ្រូ"], "sa": "guruḥ", "eg": "sbꜣ", "egh": "𓋴𓃀𓄿𓀀", "note": ""}, {"en": ["book", "writing", "scroll"], "de": ["buch", "schrift"], "ar": ["كتاب"], "zh": ["书"], "km": ["សៀវភៅ"], "sa": "pustakam", "eg": "mḏꜣt", "egh": "𓅓𓆓𓄿𓏏𓏛", "note": ""}, {"en": ["script", "letter", "writing system"], "de": ["schrift", "buchstabe"], "ar": ["خط", "حرف"], "zh": ["文字", "字母"], "km": ["អក្សរ"], "sa": "lipiḥ", "eg": "sš", "egh": "𓏞", "note": ""}, {"en": ["stone"], "de": ["stein"], "ar": ["حجر"], "zh": ["石头", "石"], "km": ["ថ្ម"], "sa": "śilā", "eg": "jnr", "egh": "𓇋𓈖𓂋𓊌", "note": ""}, {"en": ["gold"], "de": ["gold"], "ar": ["ذهب"], "zh": ["金", "黄金"], "km": ["មាស"], "sa": "suvarṇam", "eg": "nbw", "egh": "𓋞", "note": ""}, {"en": ["pyramid"], "de": ["pyramide"], "ar": ["هرم"], "zh": ["金字塔"], "km": ["ពីរ៉ាមីត"], "sa": "", "eg": "mr", "egh": "𓍋𓂋𓉴", "note": ""}, {"en": ["egypt"], "de": ["ägypten"], "ar": ["مصر"], "zh": ["埃及"], "km": ["អេហ្ស៊ីប"], "sa": "", "eg": "Kmt", "egh": "𓆎𓏏𓊖", "note": "Kmt 'the Black Land', the Egyptians' own name for Egypt."}, {"en": ["india"], "de": ["indien"], "ar": ["الهند", "هند"], "zh": ["印度"], "km": ["ឥណ្ឌា"], "sa": "bhāratam", "eg": "", "egh": "", "note": "Bhārata is the Sanskrit name of India."}, {"en": ["not", "no"], "de": ["nicht", "kein", "nein"], "ar": ["لا", "ليس", "لم"], "zh": ["不", "没"], "km": ["មិន", "ទេ"], "sa": "na", "eg": "n", "egh": "𓂜", "note": ""}, {"en": ["and", "with"], "de": ["und", "mit"], "ar": ["و", "مع"], "zh": ["和", "与"], "km": ["និង", "ជាមួយ"], "sa": "ca", "eg": "ḥnꜥ", "egh": "𓎛𓈖𓂝", "note": "Sanskrit ca follows the word it joins: rājā devaś ca 'the king and the god'."}, {"en": ["in", "at"], "de": ["in", "im", "an"], "ar": ["في"], "zh": ["在"], "km": ["ក្នុង", "នៅ"], "sa": "", "eg": "m", "egh": "𓅓", "note": "Sanskrit expresses 'in' with the locative case ending (-e, -i)."}, {"en": ["this", "these"], "de": ["dies", "dieser", "diese", "dieses"], "ar": ["هذا", "هذه"], "zh": ["这", "这个"], "km": ["នេះ"], "sa": "idam", "eg": "pn", "egh": "𓊪𓈖", "note": ""}, {"en": ["one"], "de": ["eins", "ein", "eine"], "ar": ["واحد"], "zh": ["一"], "km": ["មួយ"], "sa": "ekam", "eg": "wꜥ", "egh": "𓌡𓏤", "note": ""}, {"en": ["two"], "de": ["zwei"], "ar": ["اثنان"], "zh": ["二", "两"], "km": ["ពីរ"], "sa": "dve", "eg": "snwj", "egh": "𓏤𓏤", "note": ""}, {"en": ["three"], "de": ["drei"], "ar": ["ثلاثة"], "zh": ["三"], "km": ["បី"], "sa": "trīṇi", "eg": "ḫmt", "egh": "𓏤𓏤𓏤", "note": ""}, {"en": ["dharma", "law", "duty", "religion"], "de": ["gesetz", "pflicht", "religion"], "ar": ["شريعة", "دين", "واجب"], "zh": ["法"], "km": ["ធម៌"], "sa": "dharmaḥ", "eg": "hp", "egh": "𓐑𓊪", "note": ""}, {"en": ["victory"], "de": ["sieg"], "ar": ["نصر"], "zh": ["胜利"], "km": ["ជ័យជម្នះ"], "sa": "jayaḥ", "eg": "nḫt", "egh": "𓈖𓐍𓏏𓂡", "note": ""}, {"en": ["lion"], "de": ["löwe"], "ar": ["أسد"], "zh": ["狮子"], "km": ["តោ"], "sa": "siṃhaḥ", "eg": "mꜣj", "egh": "𓌳𓇋𓃭", "note": ""}, {"en": ["city", "town"], "de": ["stadt"], "ar": ["مدينة"], "zh": ["城市"], "km": ["ទីក្រុង"], "sa": "nagaram", "eg": "njwt", "egh": "𓊖", "note": ""}, {"en": ["village"], "de": ["dorf"], "ar": ["قرية"], "zh": ["村庄"], "km": ["ភូមិ"], "sa": "grāmaḥ", "eg": "dmj", "egh": "𓂧𓅓𓇋𓊖", "note": ""}, {"en": ["gift", "offering"], "de": ["gabe", "opfer", "geschenk"], "ar": ["هدية", "قربان", "عطية"], "zh": ["礼物", "供品"], "km": ["តង្វាយ", "ទាន"], "sa": "dānam", "eg": "ḥtp", "egh": "𓊵𓏏𓊪", "note": ""}, {"en": ["protection", "armour"], "de": ["schutz", "rüstung"], "ar": ["حماية", "درع"], "zh": ["保护", "铠甲"], "km": ["ការពារ"], "sa": "varma", "eg": "mkt", "egh": "𓅓𓎡𓏏", "note": ""}, {"en": ["hello", "hail", "welcome"], "de": ["hallo", "heil", "willkommen"], "ar": ["مرحبا", "السلام"], "zh": ["你好"], "km": ["សួស្តី"], "sa": "svasti", "eg": "jnḏ-ḥr", "egh": "𓇋𓈖𓆓𓁷", "note": "Egyptian jnḏ ḥr.k 'hail to you' (lit. 'greetings to your face')."}, {"en": ["thank you", "thanks"], "de": ["danke"], "ar": ["شكرا"], "zh": ["谢谢"], "km": ["អរគុណ"], "sa": "dhanyavādaḥ", "eg": "", "egh": "", "note": "Sanskrit dhanyavādaḥ is the modern expression; no Egyptian equivalent is attested as a fixed phrase."}];
+const OFFLINE=!!(window.AksharaAndroid);
+const SA_PERS={I:[["ati","āmi"],["āti","āmi"],["oti","omi"],["ate","e"]],you:[["ati","asi"],["āti","āsi"],["oti","oṣi"],["ate","ase"]],we:[["ati","āmaḥ"],["āti","āmaḥ"],["oti","umaḥ"],["ate","āmahe"]]};
+const isVerb=c=>/(ati|āti|oti|ate)$/.test(c.sa||"");
+function saConj(base,p){const r=(SA_PERS[p]||[]).find(([a])=>base.endsWith(a));return r?base.slice(0,-r[0].length)+r[1]:base}
+const FORM={};const FORMS={};const SAF={};const EGF={};
+const STOP=new Set(["the","a","an","of","der","die","das","den","dem","des","ein","eine","einen","einem","einer"]);
+const TO_WORDS=new Set(["to","for","zu","zum","zur","für","إلى","ل","向","给予","ដល់","សម្រាប់"]);
+CONC.forEach((c,i)=>{["en","de","ar","zh","km"].forEach(l=>(c[l]||[]).forEach(f=>{const k=f.toLowerCase();if(!(k in FORM))FORM[k]=i;(FORMS[k]=FORMS[k]||[]).includes(i)||FORMS[k].push(i)}));
+  if(c.sa){SAF[c.sa]=i;if(isVerb(c))["I","you","we"].forEach(p=>SAF[saConj(c.sa,p)]=i)}
+  if(c.eg&&!(c.eg.toLowerCase() in EGF))EGF[c.eg.toLowerCase()]=i});
+const PRON={0:"I",1:"you",4:"we",2:"he",3:"she"};
+function tokenize(text){
+  const out=[];const parts=text.split(/([\s,.;:!?،؟。，、！？។]+)/);
+  for(const p of parts){if(!p||/^[\s,.;:!?،؟。，、！？។]+$/.test(p))continue;
+    if(/[\u4E00-\u9FFF\u1780-\u17FF]/.test(p)){let i=0;const s=p;while(i<s.length){let hit=null;for(let L=Math.min(8,s.length-i);L>=1;L--){const sub=s.slice(i,i+L);if(sub in FORM){hit=sub;break}}
+        if(hit){out.push({w:hit,c:FORM[hit]});i+=hit.length}else{const last=out[out.length-1];if(last&&last.c==null)last.w+=s[i];else out.push({w:s[i],c:null});i++}}continue}
+    const k=p.toLowerCase();if(STOP.has(k))continue;if(TO_WORDS.has(k)){out.push({w:p,to:true,c:null});continue}let c=FORM[k];
+    if(c==null&&/[\u0600-\u06FF]/.test(p)){for(const pre of["ال","وال","و","ب","ل","بال","لل"]){if(k.startsWith(pre)&&FORM[k.slice(pre.length)]!=null){c=FORM[k.slice(pre.length)];break}}}
+    out.push({w:p,c:c==null?null:c});
+  }
+  let subj=false,verbDone=false;
+  out.forEach(t=>{if(t.c==null)return;if(PRON[t.c]){subj=true;return}
+    const cands=FORMS[(t.w||"").toLowerCase()]||[t.c];
+    if(subj&&!verbDone){const v=cands.find(i=>isVerb(CONC[i]));if(v!=null){t.c=v;verbDone=true;return}}
+    if(isVerb(CONC[t.c]))verbDone=true;});
+  // two-word forms (thank you, writing system)
+  for(let i=0;i<out.length-1;i++){const two=(out[i].w+" "+out[i+1].w).toLowerCase();if(FORM[two]!=null){out.splice(i,2,{w:out[i].w+" "+out[i+1].w,c:FORM[two]})}}
+  return out;
+}
+function offlineTranslate(text,tk){
+  const toks=tokenize(text);const eg=tk!=="sa";
+  const subj=toks.find(t=>t.c!=null&&PRON[t.c]);const person=subj?PRON[subj.c]:null;
+  const items=[];let dropPron=false;
+  let toNote=false;
+  toks.forEach(t=>{
+    if(t.to){if(eg)items.push({src:t.w,lat:"n",eg:"𓈖",known:true,c:{en:["to, for"],de:["zu, für"],ar:["إلى، لـ"],zh:["给、为"],km:["ដល់"],note:""}});else toNote=true;return}
+    if(t.c==null){const lat=deSound(t.w);items.push({src:t.w,lat,eg:soundToHiero(lat),known:false});return}
+    const c=CONC[t.c];
+    if(eg){
+      if(!c.eg){const lat=deSound(t.w);items.push({src:t.w,lat,eg:soundToHiero(lat),known:false,c});return}
+      if(isVerb(c)&&person){const suf={I:[".j","𓀀"],you:[".k","𓎡"],he:[".f","𓆑"],she:[".s","𓋴"],we:[".n","𓈗"]}[person];
+        items.unshift({src:t.w,lat:c.eg+suf[0],eg:c.egh+suf[1],known:true,c,verb:true});dropPron=true;return}
+      items.push({src:t.w,lat:c.eg,eg:c.egh,known:true,c,pron:!!PRON[t.c]});
+    }else{
+      if(!c.sa){const lat=deSound(t.w);items.push({src:t.w,lat,known:false,c});return}
+      let sa=c.sa;if(isVerb(c)&&person&&person!=="he"&&person!=="she")sa=saConj(sa,person);
+      items.push({src:t.w,lat:sa,known:true,c});
+    }
+  });
+  const final=eg&&dropPron?items.filter(x=>!x.pron):items;
+  return {items:final,eg,person,toNote};
+}
+function renderOffline(res,tk,el){
+  const lat=res.items.map(x=>x.lat).join(" ");
+  const script=res.eg?`<div class="eg compose-script">${esc(res.items.map(x=>x.eg).join(" "))}</div>`:`<div class="compose-script pl-line">${palHTML(latinToGrantha(lat.toLowerCase()))}</div>`;
+  const back=["de","en","ar","zh","km"].map(l=>{const words=res.items.map(x=>x.c?(x.c[l]||[])[0]||x.src:x.src);return `<div><span class="lab">${l.toUpperCase()}</span><span class="${{ar:"ar",zh:"zh",km:"km"}[l]||""}">${esc(words.join(l==="zh"||l==="km"?"":" "))}</span></div>`}).join("");
+  el.innerHTML=`<article class="an-card">
+    <div class="scan-head"><b>${res.eg?(tk==="oe"?"Old Egyptian":"Middle Egyptian"):"Sanskrit in Pallava script"}</b><span class="conf">offline · word by word</span></div>
+    ${script}<p class="tl">${esc(lat)}</p>
+    <div class="il">${res.items.map(x=>`<div class="ilw"><span class="ilo ${res.eg?"eg":"pl-line"}">${res.eg?esc(x.eg):palHTML(latinToGrantha(x.lat.toLowerCase()))}</span><span class="ilt">${esc(x.lat)}</span><span class="ilg">${esc(x.known?(x.c.en[0]+(x.verb?" ("+(res.person||"")+")":"")):"“"+x.src+"” by sound")}</span></div>`).join("")}</div>
+    <h4>Back into the five languages (word by word)</h4><div class="ml5">${back}</div>
+    ${res.items.some(x=>x.c&&x.c.note&&x.c.note.trim())?`<ul class="plain small-note">${res.items.filter(x=>x.c&&x.c.note&&x.c.note.trim()).map(x=>`<li>${esc(x.c.note)}</li>`).join("")}</ul>`:""}
+    ${res.toNote?'<p class="small-note">Sanskrit expresses "to / for" with the dative case ending (e.g. devāya "to the god", devebhyaḥ "to the gods") instead of a separate word; the word-by-word result keeps dictionary forms.</p>':""}
+    <div class="note">Offline translation uses the built-in dictionary of ${CONC.length} core words and simple grammar rules: verb person in Sanskrit (vadāmi "I speak"), verb-first order with suffix pronouns in Egyptian (ḏd.j "I say"). Words not in the dictionary, like names, are written by sound and marked. It's a learning aid for reading word by word, not a fluent translation.</div>
+    <div class="row-actions">${res.eg?'<button class="btn" id="offHg">Open in hieroglyph writer</button>':'<button class="btn" id="offPal">Open in Pallava writer</button>'}</div>
+  </article>`;
+  const b1=document.getElementById("offPal");if(b1)b1.onclick=()=>{showTab("pallava");palSetFromText(latinToGrantha(lat.toLowerCase()),true)};
+  const b2=document.getElementById("offHg");if(b2)b2.onclick=()=>hgOpen(res.items.map(x=>x.eg).join(" "),lat);
+}
+// reverse: Sanskrit or Egyptian -> five languages
+function offlineReverse(text){
+  const toks=text.trim().split(/[\s,;:!?।॥|]+/).filter(Boolean);
+  const items=toks.map(w=>{let k=w.toLowerCase().normalize("NFC").replace(/[.]$/,"");if(/[\u{11300}-\u{1137F}]/u.test(k))k=granthaToLatin(k);
+    let c=SAF[k];if(c==null)c=EGF[k];if(c==null){const m=mdcToLeiden(w.normalize("NFC")).toLowerCase();c=SAF[m]!=null?SAF[m]:EGF[m];if(c==null){const base=m.replace(/\.(j|k|f|s|n|ṯ|tn|sn)$/,"");if(EGF[base]!=null)return{w,c:EGF[base],suf:m.slice(base.length)}}}
+    if(c==null){const base=k.replace(/\.(j|k|f|s|n|ṯ|tn|sn)$/,"");c=EGF[base];if(c!=null)return{w,c,suf:k.slice(base.length)}}
+    return{w,c}});
+  return items;
+}
+function renderReverse(items,el){
+  const SUFM={".j":"I/my",".k":"you/your",".f":"he/his",".s":"she/her",".n":"we/our"};
+  el.innerHTML=`<article class="an-card"><div class="scan-head"><b>Offline reading</b><span class="conf">word by word</span></div>
+    <div class="table-wrap"><table class="tx"><tr><th>Word</th><th>DE</th><th>EN</th><th>AR</th><th>ZH</th><th>KM</th></tr>
+    ${items.map(x=>{const c=x.c!=null?CONC[x.c]:null;return `<tr><td><i>${esc(x.w)}</i>${x.suf?`<br><small>${esc(x.suf+" = "+(SUFM[x.suf]||""))}</small>`:""}</td>${["de","en","ar","zh","km"].map(l=>`<td class="${{ar:"ar",zh:"zh",km:"km"}[l]||""}">${c?esc((c[l]||[])[0]||""):"—"}</td>`).join("")}</tr>`}).join("")}
+    </table></div>
+    <p class="small-note">Words marked — aren't in the offline dictionary (${CONC.length} core words plus the Lexicon tab). Endings are recognised for Sanskrit verbs (-āmi, -asi, -āmaḥ) and Egyptian suffix pronouns (.j .k .f .s .n).</p></article>`;
+}
+
+function renderGloss7(text,el){
+  const toks=tokenize(text);
+  el.innerHTML=`<article class="an-card"><div class="scan-head"><b>Offline word-by-word</b><span class="conf">dictionary</span></div>
+  <div class="table-wrap"><table class="tx"><tr><th>Word</th><th>Sanskrit (Pallava)</th><th>Egyptian</th><th>DE</th><th>EN</th><th>AR</th><th>ZH</th><th>KM</th></tr>
+  ${toks.map(t=>{const c=t.c!=null?CONC[t.c]:null;return `<tr><td><b>${esc(t.w)}</b></td><td>${c&&c.sa?`<span class="pl-line" style="font-size:1.4rem">${palHTML(latinToGrantha(c.sa))}</span><br><i>${esc(c.sa)}</i>`:"—"}</td><td>${c&&c.eg?`<span class="eg" style="font-size:1.5rem">${esc(c.egh)}</span><br><i>${esc(c.eg)}</i>`:"—"}</td>${["de","en","ar","zh","km"].map(l=>`<td class="${{ar:"ar",zh:"zh",km:"km"}[l]||""}">${c?esc((c[l]||[])[0]||""):"—"}</td>`).join("")}</tr>`}).join("")}
+  </table></div><p class="small-note">Built-in dictionary of ${CONC.length} core words; works without internet. Use "Translate into Pallava / Egyptian" to build a sentence.</p></article>`;
+}
+if(OFFLINE){
+  document.body.classList.add("offline-app");
+  const sg=document.getElementById("scanGo");if(sg)sg.hidden=true;
+  const ab=document.getElementById("tlAkshBox");if(ab)ab.remove();
+  const ol=document.getElementById("anOffNote");if(ol)ol.hidden=false;
+}
 
 // theme
 function applyTheme(t){if(t)document.documentElement.setAttribute("data-theme",t);else document.documentElement.removeAttribute("data-theme")}

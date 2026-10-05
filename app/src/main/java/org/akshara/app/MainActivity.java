@@ -24,14 +24,8 @@ import android.webkit.WebViewClient;
 import androidx.core.content.FileProvider;
 import androidx.webkit.WebViewAssetLoader;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 
 /**
  * Akshara: hosts the offline web app from app assets in a WebView,
@@ -151,41 +145,6 @@ public class MainActivity extends Activity {
                 InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
                 if (imm != null) imm.showInputMethodPicker();
             });
-        }
-
-        /** Fetches text from Aksharamukha's public API only (no other hosts). Runs on the bridge thread. */
-        @JavascriptInterface
-        public String httpGet(String address) {
-            HttpURLConnection c = null;
-            try {
-                URL url = new URL(address);
-                String host = url.getHost();
-                if (!"https".equals(url.getProtocol()) || !(host.equals("aksharamukha-plugin.appspot.com")
-                        || host.equals("aksharamukha.appspot.com"))) {
-                    return "ERROR: host not allowed";
-                }
-                c = (HttpURLConnection) url.openConnection();
-                c.setConnectTimeout(10000);
-                c.setReadTimeout(20000);
-                int code = c.getResponseCode();
-                InputStream in = code < 400 ? c.getInputStream() : c.getErrorStream();
-                if (in == null) return "ERROR: HTTP " + code;
-                StringBuilder sb = new StringBuilder();
-                try (BufferedReader r = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
-                    String line;
-                    boolean first = true;
-                    while ((line = r.readLine()) != null) {
-                        if (!first) sb.append('\n');
-                        sb.append(line);
-                        first = false;
-                    }
-                }
-                return code < 400 ? sb.toString() : "ERROR: HTTP " + code;
-            } catch (Exception e) {
-                return "ERROR: " + e.getMessage();
-            } finally {
-                if (c != null) c.disconnect();
-            }
         }
 
         @JavascriptInterface

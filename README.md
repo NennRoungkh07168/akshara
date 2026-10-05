@@ -1,5 +1,7 @@
 # Akshara for Android
 
+**Privacy: this app is offline-only.** It has no internet permission, so Android itself blocks it from connecting anywhere. Nothing you type, write or photograph leaves your device.
+
 Five-language library (German, English, Arabic, Chinese, Khmer) with script history, Egyptian hieroglyphs and a camera scanner, packaged as an Android app.
 
 GitHub builds the APK for you, so your phone only needs Termux to send the code and fetch the result.

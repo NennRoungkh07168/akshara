@@ -10,8 +10,8 @@ android {
         applicationId "org.akshara.app"
         minSdk 24
         targetSdk 34
-        versionCode 8
-        versionName "4.4"
+        versionCode 9
+        versionName "4.5"
     }
 
     // One fixed key for every build, so new APKs install as updates

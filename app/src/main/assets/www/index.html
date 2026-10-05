@@ -6,7 +6,7 @@
 <title>Akshara — Five-Language Library</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;700&family=Noto+Sans:wght@400;600&family=Noto+Naskh+Arabic:wght@400;600&family=Noto+Sans+SC:wght@400;600&family=Noto+Sans+Khmer:wght@400;600&family=Noto+Sans+Brahmi&family=Noto+Sans+Grantha&family=Noto+Sans+Thai:wght@400;600&family=Noto+Sans+Tamil:wght@400;600&family=Noto+Sans+Egyptian+Hieroglyphs&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;700&family=Noto+Sans:wght@400;600&family=Noto+Naskh+Arabic:wght@400;600&family=Noto+Sans+SC:wght@400;600&family=Noto+Sans+Khmer:wght@400;600&family=Noto+Sans+Brahmi&family=Noto+Sans+Grantha&family=Noto+Sans+Thai:wght@400;600&family=Noto+Sans+Tamil:wght@400;600&family=Noto+Sans+Javanese&family=Noto+Sans+Egyptian+Hieroglyphs&display=swap" rel="stylesheet">
 <style>
 :root{
   box-sizing:border-box;
@@ -113,6 +113,9 @@ dl.langs dd{margin:0;color:var(--muted);font-size:.93rem}
 .compose-head{background:var(--sunk);border-radius:12px;padding:.6rem .8rem;margin:.6rem 0}
 .compose-script{font-size:2.4rem;line-height:1.5;word-break:break-word}
 .pl-line{line-height:1.7}
+.purna,.java{font-family:"PallavaUser","Noto Sans Javanese",serif}
+.java{font-family:"Noto Sans Javanese",serif}
+.tl-out .purna{font-size:1.1em}
 .tl-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
 .tl-out{min-height:5rem;font-size:2.4rem;line-height:1.6;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:.6rem .9rem;margin:.7rem 0 .3rem;word-break:break-word}
 .tl-out .eg{font-size:2.6rem}
@@ -443,12 +446,19 @@ tr.clickable:hover td{background:var(--sunk)}
           <option value="grantha">Grantha</option>
           <option value="khmer">Khmer</option>
           <option value="deva">Devanagari</option>
+          <option value="java">Javanese (Aksara Jawa)</option>
         </select></div>
     </div>
     <label class="scan-label" for="tlIn">Input text</label>
     <textarea id="tlIn" class="eg-input" rows="3" dir="auto" autocomplete="off" spellcheck="false">Ich spreche Deutsch</textarea>
     <div class="tl-out" id="tlOut"></div>
     <div class="small-note" id="tlRead"></div>
+    <div class="pal-engine"></div>
+    <div id="tlAkshBox" hidden>
+      <div class="row-actions" style="margin-top:.5rem"><button class="btn" id="tlAksh">Check with Aksharamukha online (exact)</button></div>
+      <div class="tl-out purna" id="tlAkshOut" hidden></div>
+      <div class="small-note" id="tlAkshNote"></div>
+    </div>
     <div class="row-actions" style="margin-top:.5rem">
       <button class="btn primary" id="tlCopy">Copy</button>
       <button class="btn" id="tlOpen">Open in writer</button>
@@ -525,6 +535,7 @@ tr.clickable:hover td{background:var(--sunk)}
       <button class="chip" id="palViewG" aria-pressed="false">Grantha</button>
       <button class="chip" id="palViewB" aria-pressed="false">Both</button>
     </div>
+    <div class="pal-engine"></div>
     <div class="row-actions" style="align-items:center">
       <label class="scan-label" for="palSrc" style="margin:0">Type in</label>
       <select id="palSrc" class="uilang">
@@ -1149,6 +1160,7 @@ tr.clickable:hover td{background:var(--sunk)}
       <li>Translate from any of the five languages into Sanskrit (shown in Pallava script) or Egyptian (shown in hieroglyphs), with word-by-word glosses and back-translations; a hieroglyph writer with transliteration input, lexicon spellings and a sign palette; the 9 Pallava independent vowels added to the font.</li>
       <li>Lexicon: 102 entries (Sanskrit and Tamil of Pallava inscriptions, Pyramid Texts vocabulary, royal titles and grammar words) with meanings in all five languages, grammatical use, Khmer descendants, and grammar guides for both languages.</li>
       <li>Pallava writer: the Akshara Pallava font (all 33 consonants, traced from the Aksharamukha Pallava alphabet), Grantha Unicode encoding, transliteration input, on-screen keyboard, copy and font download.</li>
+      <li>Aksharamukha compatibility: Pallava encoded in Javanese Unicode exactly as Aksharamukha does, displayed with a user-loaded Purnawarman font (full vowel signs and conjuncts); Javanese output; exact Aksharamukha check through its public API in the Android app.</li>
       <li>A camera scanner: Claude reads photos of writing in any of the app's scripts and translates them into all five languages, plus offline compare-by-eye charts and a scan history.</li>
       <li>An Egypt section: language history, 70+ signs, quiz, grammar, name and number writer, pyramids, Pyramid Texts, art and sculpture.</li>
     </ul></div>
@@ -1216,6 +1228,7 @@ tr.clickable:hover td{background:var(--sunk)}
     <input type="text" id="srcInput" placeholder="e.g. Mamallapuram, DHARMA ID, 7th c.">
     <div class="row-actions"><button class="btn primary" id="saveSrc">Save source</button></div>
     <input type="file" id="fileIn" accept="image/*" hidden>
+    <input type="file" id="fontPick" accept=".ttf,.otf,.woff,.woff2,font/*,application/octet-stream" hidden>
   </div>
 </div>
 <div class="toast" id="toast" role="status" hidden></div>
@@ -1851,7 +1864,7 @@ $("#palKb").addEventListener("click",e=>{
 });
 ["P","G","B"].forEach(k=>$("#palView"+k).onclick=()=>{palView=k.toLowerCase();["P","G","B"].forEach(x=>$("#palView"+x).setAttribute("aria-pressed",x===k));palRender()});
 $("#palClear").onclick=()=>{palSetFromText("",true)};
-$("#palCopy").onclick=async()=>{const plain=[...palText].map(ch=>PALT[ch]?String.fromCodePoint(G_CONS[PALT[ch][0]]||G_IND.a):ch).join("");try{await navigator.clipboard.writeText(plain);toast("Copied as Grantha Unicode.")}catch(e){$("#palLatin").select();toast("Copy isn't allowed here. Select the text and copy it manually.")}};
+$("#palCopy").onclick=async()=>{let plain=[...palText].map(ch=>PALT[ch]?String.fromCodePoint(G_CONS[PALT[ch][0]]||G_IND.a):ch).join("");if(palEngine()==="purna")plain=granthaToJava(plain);try{await navigator.clipboard.writeText(plain);toast("Copied as Grantha Unicode.")}catch(e){$("#palLatin").select();toast("Copy isn't allowed here. Select the text and copy it manually.")}};
 $("#palAnalyse").onclick=()=>{const lat=granthaToLatin(palText).trim();if(!lat){toast("Write something first.");return}sendToAnalyse(lat,$("#palLang").value)};
 $("#palFont").onclick=async()=>{
   const b64=PFONT_TTF;const bin=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
@@ -2015,7 +2028,7 @@ async function runCompose(text,tk){
 $("#anGo").onclick=()=>anMode==="analyse"?runAnalyse($("#anIn").value,$("#anLang").value):runCompose($("#anIn").value,$("#anTarget").value);
 
 // ===== CLEAN PALLAVA RENDERING (no mixed fonts) =====
-function palHTML(g){return String(g||"").split(/(\s+)/).map(w=>/^\s+$/.test(w)?(w.includes("\n")?"<br>":" "):(w?`<span class="pw">${palWordHTML(w)}</span>`:"")).join("")}
+function palHTML(g){if(palEngine()==="purna")return `<span class="purna">${esc(granthaToJava(g)).replace(/\n/g,"<br>")}</span>`;return String(g||"").split(/(\s+)/).map(w=>/^\s+$/.test(w)?(w.includes("\n")?"<br>":" "):(w?`<span class="pw">${palWordHTML(w)}</span>`:"")).join("")}
 function palWordHTML(g){
   const cs=[...String(g||"")];let out="";
   for(let i=0;i<cs.length;i++){
@@ -2150,7 +2163,8 @@ function tlRun(){
   const out=$("#tlOut");let html="",plain="";
   if(to==="hiero"){plain=from==="egy"?hiero:soundToHiero(latin);html=`<div class="eg">${esc(plain)}</div>`;if(from!=="egy")note=(note?note+" ":"")+"Hieroglyphs here use the alphabet signs by sound, the way Egyptians wrote foreign names; for Egyptian words, choose Egyptian transliteration as the source."}
   else if(from==="egy"){html='<p class="small-note">Egyptian transliteration converts to hieroglyphs only. Choose Egyptian hieroglyphs as the target.</p>'}
-  else if(to==="pallava"){plain=gr;html=`<div class="pl-line">${palHTML(gr)}</div>`}
+  else if(to==="pallava"){plain=palEngine()==="purna"?granthaToJava(gr):gr;html=`<div class="pl-line">${palHTML(gr)}</div>`}
+  else if(to==="java"){plain=latinToJava(latin);html=`<div class="java">${esc(plain)}</div>`}
   else{const T=SCRIPTS[to];plain=to==="grantha"?gr:latinToScript(latin,T);html=`<div class="${to==="brahmi"?"br":to==="grantha"?"gr":to==="khmer"?"km":""}">${esc(plain)}</div>`}
   out.innerHTML=html;out.dataset.plain=plain;
   $("#tlRead").textContent=latin.trim()?"Reading: "+latin:"";
@@ -2162,8 +2176,71 @@ $("#tlCopy").onclick=async()=>{const t=$("#tlOut").dataset.plain||"";try{await n
 $("#tlOpen").onclick=()=>{const from=$("#tlFrom").value,to=$("#tlTo").value,txt=$("#tlIn").value;
   if(to==="hiero")hgOpen($("#tlOut").dataset.plain||"",from==="egy"?txt:"");
   else{showTab("pallava");const g=from==="khmer"?khmerToGrantha(txt):from==="deva"?devaToGrantha(txt):latinToGrantha(from==="de"?deSound(txt):from==="en"?enSound(txt):from==="hk"?normLatin(txt):txt.toLowerCase());palSetFromText(g,true)}};
+if(window.AksharaAndroid&&AksharaAndroid.httpGet){$("#tlAkshBox").hidden=false}
+$("#tlAksh").onclick=()=>{
+  const from=$("#tlFrom").value,txt=$("#tlIn").value.trim();if(!txt)return;
+  const src={hk:"HK",iso:"IAST",khmer:"Khmer",deva:"Devanagari"}[from]||"IAST";
+  const text=(from==="de"||from==="en")?$("#tlRead").textContent.replace(/^Reading: /,""):txt;
+  $("#tlAkshNote").textContent="Asking Aksharamukha…";$("#tlAkshOut").hidden=true;
+  setTimeout(()=>{
+    const url="https://aksharamukha-plugin.appspot.com/api/public?source="+encodeURIComponent(src)+"&target=Pallava&text="+encodeURIComponent(text);
+    let r="";try{r=AksharaAndroid.httpGet(url)}catch(e){r="ERROR: "+e}
+    if(!r||r.startsWith("ERROR")){$("#tlAkshNote").textContent="Couldn't reach Aksharamukha ("+(r||"no answer")+"). The offline result above still works.";return}
+    $("#tlAkshOut").textContent=r;$("#tlAkshOut").hidden=false;
+    $("#tlAkshNote").textContent=purnaReady?"Official Aksharamukha output ("+src+" → Pallava), shown in your Pallava font.":"Official Aksharamukha output. It appears as Javanese letters until you load the Purnawarman font above.";
+  },30);
+};
 $("#tlTranslate").onclick=()=>{showTab("analyse");setAnMode("compose");$("#anIn").value=$("#tlIn").value};
 tlRun();
+
+// ===== AKSHARAMUKHA-COMPATIBLE PALLAVA (Javanese encoding + Purnawarman font) =====
+// Aksharamukha encodes Pallava with Javanese Unicode and displays it with the Purnawarman font.
+SCRIPTS.java={
+  CONS:{k:"ꦏ",kh:"ꦑ",g:"ꦒ",gh:"ꦓ","ṅ":"ꦔ",c:"ꦕ",ch:"ꦖ",j:"ꦗ",jh:"ꦙ","ñ":"ꦚ","ṭ":"ꦛ","ṭh":"ꦜ","ḍ":"ꦝ","ḍh":"ꦞ","ṇ":"ꦟ",t:"ꦠ",th:"ꦡ",d:"ꦢ",dh:"ꦣ",n:"ꦤ",p:"ꦥ",ph:"ꦦ",b:"ꦧ",bh:"ꦨ",m:"ꦩ",y:"ꦪ",r:"ꦫ",l:"ꦭ","ḷ":"ꦭ",v:"ꦮ","ś":"ꦯ","ṣ":"ꦰ",s:"ꦱ",h:"ꦲ"},
+  IND:{a:"ꦄ","ā":"ꦄꦴ",i:"ꦆ","ī":"ꦇ",u:"ꦈ","ū":"ꦈꦴ","ṛ":"ꦉ",e:"ꦌ",ai:"ꦍ",o:"ꦎ",au:"ꦎꦴ"},
+  SIGN:{"ā":"ꦴ",i:"ꦶ","ī":"ꦷ",u:"ꦸ","ū":"ꦹ","ṛ":"ꦽ",e:"ꦺ",ai:"ꦻ",o:"ꦺꦴ",au:"ꦻꦴ"},
+  VIR:"꧀",ANU:"ꦁ",VIS:"ꦃ"};
+function latinToJava(lat){
+  let s=latinToScript(lat,SCRIPTS.java).replace(/।/g,"꧈").replace(/॥/g,"꧉");
+  const C="[\\uA98F-\\uA9B2]";
+  s=s.replace(new RegExp("ꦫ꧀(?="+C+")","g"),"ꦂ");          // r before a consonant -> layar (repha)
+  s=s.replace(new RegExp("("+C+")꧀ꦫ","g"),"$1ꦿ");           // consonant + r -> cakra
+  s=s.replace(new RegExp("("+C+")꧀ꦪ","g"),"$1ꦾ");           // consonant + y -> pengkal
+  return s;
+}
+function granthaToJava(g){return latinToJava(granthaToLatin(g))}
+// user-supplied Pallava font (Purnawarman, Sundapura, Kawitan: any Javanese-slot Pallava font)
+var purnaReady=false;
+async function loadUserFont(buf){
+  try{const ff=new FontFace("PallavaUser",buf);await ff.load();document.fonts.add(ff);purnaReady=true;document.body.classList.add("purna-on");return true}catch(e){purnaReady=false;return false}
+}
+(async()=>{try{const b=await idbGet("font:pallava-user");if(b)await loadUserFont(b)}catch(e){}palEngineUI();if(typeof tlRun==="function")tlRun();palRender();lexRender()})();
+function palEngine(){return purnaReady&&store.get("palEngine","purna")==="purna"?"purna":"akshara"}
+function palEngineUI(){
+  document.querySelectorAll(".pal-engine").forEach(box=>{
+    const eng=palEngine();
+    box.innerHTML=`<div class="row-actions" style="align-items:center">
+      <span class="scan-label" style="margin:0">Pallava font:</span>
+      <button class="chip" data-eng="akshara" aria-pressed="${eng==="akshara"}">Akshara (built-in)</button>
+      <button class="chip" data-eng="purna" aria-pressed="${eng==="purna"}">${purnaReady?"Purnawarman (Aksharamukha)":"Purnawarman: load font…"}</button>
+    </div>
+    <p class="small-note" style="margin:.2rem 0 0">${purnaReady?"Font loaded. Text is encoded the Aksharamukha way (Javanese Unicode), with every vowel sign and conjunct.":"For output identical to Aksharamukha, download the free Purnawarman font by Ki Basajan (aksaradinusantara.com → Fonta → Pallawa, or the link on Aksharamukha's Pallava page), then tap the button and choose the .ttf file. It's saved in the app."}</p>`;
+  });
+}
+document.addEventListener("click",async e=>{
+  const b=e.target.closest(".pal-engine [data-eng]");if(!b)return;
+  if(b.dataset.eng==="akshara"){store.set("palEngine","akshara")}
+  else if(!purnaReady){const inp=document.getElementById("fontPick");inp.value="";inp.click();return}
+  else store.set("palEngine","purna");
+  palEngineUI();palRender();lexRender();if(typeof tlRun==="function")tlRun();
+});
+document.getElementById("fontPick").addEventListener("change",async e=>{
+  const f=e.target.files&&e.target.files[0];if(!f)return;
+  const buf=await f.arrayBuffer();
+  if(await loadUserFont(buf.slice(0))){await idbPut("font:pallava-user",buf);store.set("palEngine","purna");toast("Pallava font loaded: "+f.name)}
+  else toast("That file couldn't be used as a font. Choose a .ttf or .otf file.");
+  palEngineUI();palRender();lexRender();if(typeof tlRun==="function")tlRun();
+});
 
 // theme
 function applyTheme(t){if(t)document.documentElement.setAttribute("data-theme",t);else document.documentElement.removeAttribute("data-theme")}

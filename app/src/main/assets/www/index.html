@@ -112,6 +112,13 @@ dl.langs dd{margin:0;color:var(--muted);font-size:.93rem}
 .hg-key .eg{display:block;font-size:1.7rem;line-height:1.4}
 .compose-head{background:var(--sunk);border-radius:12px;padding:.6rem .8rem;margin:.6rem 0}
 .compose-script{font-size:2.4rem;line-height:1.5;word-break:break-word}
+.pl-line{line-height:1.7}
+.pw{white-space:nowrap;display:inline-block;margin-right:.25em}
+.syl{display:inline-flex;align-items:flex-start;white-space:nowrap}
+.syl sup.vs{font-family:var(--sans);font-size:.36em;color:var(--gold);margin-left:.04em;line-height:1.1;font-weight:600}
+.syl.dead .pal{font-size:.72em;opacity:.8;align-self:flex-end}
+.pl-miss{font-family:var(--sans);font-size:.45em;color:var(--gold);align-self:center}
+body.no-hints .syl sup.vs{display:none}
 .ta{font-family:"Noto Sans Tamil","Tamil Sangam MN","Nirmala UI",sans-serif}
 .lex-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:.8rem .95rem;margin:.6rem 0}
 .lex-top{display:flex;gap:.9rem;align-items:center}
@@ -450,8 +457,11 @@ tr.clickable:hover td{background:var(--sunk)}
       <button class="btn primary" id="anGo">Analyse in 5 languages</button>
       <button class="btn" id="anStop" hidden>Stop</button>
     </div>
+    <div id="anDict"></div>
     <div id="anKeyBox" class="note" hidden>
-      <p style="margin:.1rem 0 .5rem">This copy runs outside Claude, so analysis needs your own Anthropic API key (saved only on this device). Add it in the Scan tab, or here:</p>
+      <p style="margin:.1rem 0 .5rem"><b>Full translation and analysis need Claude.</b> The offline dictionary above works without it. You have two options:</p>
+      <p style="margin:.1rem 0 .5rem">1. Use the online version, which runs on your Claude account with no key: <a href="https://claude.ai/artifact/QVnirod5wK4fi2jLhGHWs6" target="_blank" rel="noopener">open Akshara online</a> (sign in to claude.ai first).</p>
+      <p style="margin:.1rem 0 .5rem">2. Or add an Anthropic API key from console.anthropic.com (paid per use, saved only on this device):</p>
       <input type="password" id="anKey" class="eg-input" placeholder="sk-ant-…" autocomplete="off">
       <div class="row-actions"><button class="btn primary" id="anSaveKey">Save key</button></div>
     </div>
@@ -475,8 +485,19 @@ tr.clickable:hover td{background:var(--sunk)}
       <button class="chip" id="palViewG" aria-pressed="false">Grantha</button>
       <button class="chip" id="palViewB" aria-pressed="false">Both</button>
     </div>
-    <label class="scan-label" for="palLatin">Transliteration (ISO 15919, or ASCII: T D N retroflex, G = ṅ, J = ñ, z = ś, S = ṣ, A I U long, M = ṃ, H = ḥ)</label>
+    <div class="row-actions" style="align-items:center">
+      <label class="scan-label" for="palSrc" style="margin:0">Type in</label>
+      <select id="palSrc" class="uilang">
+        <option value="latin">Latin (ISO / IAST / Harvard-Kyoto)</option>
+        <option value="khmer">Khmer script</option>
+        <option value="deva">Devanagari</option>
+        <option value="grantha">Grantha Unicode</option>
+      </select>
+      <button class="chip" id="palHints" aria-pressed="true">Vowel hints</button>
+    </div>
+    <label class="scan-label" for="palLatin" id="palSrcHelp">Latin: ISO 15919 / IAST, or ASCII: T D N retroflex, G = ṅ, J = ñ, z = ś, S = ṣ, A I U long, R = ṛ, M = ṃ, H = ḥ</label>
     <input type="text" id="palLatin" class="eg-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. namaH zivAya">
+    <div class="small-note" id="palConvNote"></div>
     <div class="pal-kb" id="palKb"></div>
     <div class="note" id="palImeBox">
       <b>Pallava keyboard for your whole phone</b>
@@ -1642,7 +1663,7 @@ const LANG5=[["de","German",""],["en","English",""],["ar","Arabic","ar"],["zh","
 function scriptClass(s){s=String(s||"");if(/[\u{13000}-\u{1342F}]/u.test(s))return"eg";if(/[\u{11300}-\u{1137F}\uE000-\uE00F]/u.test(s))return"pal";if(/[\u0600-\u06FF]/.test(s))return"ar";if(/[\u1780-\u17FF]/.test(s))return"km";if(/[\u4E00-\u9FFF]/.test(s))return"zh";if(/[\u0E00-\u0E7F]/.test(s))return"th";if(/[\u{11000}-\u{1107F}]/u.test(s))return"br";return""}
 function ilHTML(words){
   if(!Array.isArray(words)||!words.length)return"";
-  return `<div class="il" dir="ltr">${words.map(w=>`<div class="ilw"><span class="ilo ${scriptClass(w.w)}" dir="auto">${esc(w.w||"")}</span>${w.t?`<span class="ilt">${esc(w.t)}</span>`:""}<span class="ilg">${esc(w.g||"")}</span></div>`).join("")}</div>`;
+  return `<div class="il" dir="ltr">${words.map(w=>`<div class="ilw">${scriptClass(w.w)==="pal"?`<span class="ilo pl-line">${palHTML(w.w)}</span>`:`<span class="ilo ${scriptClass(w.w)}" dir="auto">${esc(w.w||"")}</span>`}${w.t?`<span class="ilt">${esc(w.t)}</span>`:""}<span class="ilg">${esc(w.g||"")}</span></div>`).join("")}</div>`;
 }
 function renderAnalysis(a,el){
   if(!a||!a.source){el.innerHTML='<p class="small-note">No analysis came back.</p>';return}
@@ -1756,16 +1777,22 @@ function palRender(){
   const pal=chars.map(ch=>/\s/.test(ch)?ch:(PFONT.includes(ch.codePointAt(0))?esc(ch):`<span class="fb">${esc(ch)}</span>`)).join("");
   const plain=chars.map(ch=>PALT[ch]?String.fromCodePoint(G_CONS[PALT[ch][0]]||G_IND.a):ch).join("");
   if(!palText){show.innerHTML='<span class="small-note" style="font-family:var(--sans)">Your Pallava text appears here.</span>'}
-  else if(palView==="p")show.innerHTML=`<div class="pal">${pal}</div>`;
+  else if(palView==="p")show.innerHTML=`<div class="pl-line">${palHTML(palText)}</div>`;
   else if(palView==="g")show.innerHTML=`<div class="gr">${esc(plain)}</div>`;
-  else show.innerHTML=`<div class="pal">${pal}</div><div class="gr" style="font-size:.7em;opacity:.85">${esc(plain)}</div>`;
+  else show.innerHTML=`<div class="pl-line">${palHTML(palText)}</div><div class="gr" style="font-size:.7em;opacity:.85">${esc(plain)}</div>`;
   $("#palInspect").innerHTML="<tr><th>Char</th><th>Code</th><th>Reading</th><th>In font</th></tr>"+chars.filter(c=>!/\s/.test(c)).slice(0,80).map(c=>{const cp=c.codePointAt(0);const rd=PALT[c]||R_CONS[cp]&&(R_CONS[cp]+"a")||R_IND[cp]||(R_SIGN[cp]&&("-"+R_SIGN[cp]))||(cp===VIR?"virama":cp===ANU?"anusvāra ṃ":cp===VIS?"visarga ḥ":"");return `<tr><td class="pal" style="font-size:1.5rem">${esc(c)}</td><td>U+${cp.toString(16).toUpperCase()}</td><td>${esc(rd)}</td><td>${PFONT.includes(cp)?"Pallava":"Grantha fallback"}</td></tr>`}).join("");
   store.set("paltext",palText);
   const pd=document.getElementById("palDirect");if(pd&&document.activeElement!==pd&&pd.value!==palText)pd.value=palText;
 }
-function palSetFromText(t,updateLatin){palText=t;if(updateLatin)$("#palLatin").value=granthaToLatin(t);palRender()}
+function palSetFromText(t,updateLatin){palText=t;if(updateLatin){const sel=document.getElementById("palSrc");if(sel&&sel.value!=="latin"){sel.value="latin";const h=document.getElementById("palSrcHelp");if(h)h.textContent="Latin: ISO 15919 / IAST, or ASCII shortcuts"}$("#palLatin").value=granthaToLatin(t)}palRender()}
 $("#palLatin").value=granthaToLatin(palText);
-$("#palLatin").addEventListener("input",e=>palSetFromText(latinToGrantha(e.target.value),false));
+const PAL_HELP={latin:"Latin: ISO 15919 / IAST, or ASCII: T D N retroflex, G = ṅ, J = ñ, z = ś, S = ṣ, A I U long, R = ṛ, M = ṃ, H = ḥ",khmer:"Khmer: each Khmer letter becomes its Pallava parent letter (works best for Pali and Sanskrit words; Khmer-only vowels are approximated)",deva:"Devanagari: letter-for-letter conversion to Pallava",grantha:"Grantha Unicode: shown in Pallava form"};
+function palConvert(v){const src=$("#palSrc").value;let g;khApprox=false;
+  if(src==="khmer")g=khmerToGrantha(v);else if(src==="deva")g=devaToGrantha(v);else if(src==="grantha")g=v;else g=latinToGrantha(v);
+  palText=g;palRender();$("#palConvNote").textContent=(src!=="latin"&&g?"Reading: "+granthaToLatin(g):"")+(src==="khmer"&&khApprox?" · Some Khmer vowel or r-signs have no exact Sanskrit equivalent and were approximated.":"");}
+$("#palLatin").addEventListener("input",e=>palConvert(e.target.value));
+$("#palSrc").addEventListener("change",()=>{$("#palSrcHelp").textContent=PAL_HELP[$("#palSrc").value];$("#palLatin").value="";$("#palLatin").placeholder=$("#palSrc").value==="khmer"?"e.g. ធម៌ ពុទ្ធ":$("#palSrc").value==="deva"?"e.g. धर्म":"e.g. namaH zivAya";palConvert("")});
+$("#palHints").onclick=()=>{const on=$("#palHints").getAttribute("aria-pressed")!=="true";$("#palHints").setAttribute("aria-pressed",on);document.body.classList.toggle("no-hints",!on)};
 const KB_CONS=[["k","kh","g","gh","ṅ"],["c","ch","j","jh","ñ"],["ṭ","ṭh","ḍ","ḍh","ṇ"],["t","th","d","dh","n"],["p","ph","b","bh","m"],["y","r","l","v","ś"],["ṣ","s","h"]];
 function lastIsBareCons(){const cs=[...palText];const l=cs[cs.length-1];if(!l)return false;const cp=l.codePointAt(0);return !!R_CONS[cp]||(PALT[l]&&PALT[l]!=="a")}
 $("#palKb").innerHTML=
@@ -1810,7 +1837,7 @@ let lexCat="all";
 function lexWord(e){return e.tr.split(/ \(| \//)[0]}
 function lexCard(e,i){
   let script="";
-  if(e.cat.startsWith("sa")){const g=latinToGrantha(lexWord(e).toLowerCase());script=`<div class="lex-script pal">${esc(g)}</div>`}
+  if(e.cat.startsWith("sa")){const g=latinToGrantha(lexWord(e).toLowerCase());script=`<div class="lex-script pl-line">${palHTML(g)}</div>`}
   else if(e.cat==="ta")script=`<div class="lex-script ta">${esc(e.script)}</div>`;
   else script=`<div class="lex-script eg">${esc(e.script)}</div>`;
   const lab={sa:"Pallava · Sanskrit","sa-ph":"Pallava · phrase / title",ta:"Pallava · Tamil",eg:"Egyptian","eg-gr":"Egyptian · grammar word"}[e.cat];
@@ -1890,7 +1917,7 @@ hgPal();hgRender();
 
 // ===== TRANSLATE INTO PALLAVA / EGYPTIAN =====
 let anMode="analyse";
-function setAnMode(m){anMode=m;$("#anModeA").setAttribute("aria-pressed",m==="analyse");$("#anModeT").setAttribute("aria-pressed",m==="compose");
+function setAnMode(m){anMode=m;$("#anDict").innerHTML="";$("#anModeA").setAttribute("aria-pressed",m==="analyse");$("#anModeT").setAttribute("aria-pressed",m==="compose");
   $("#anLangWrap").hidden=m!=="analyse";$("#anTargetWrap").hidden=m!=="compose";
   $("#anGo").textContent=m==="analyse"?"Analyse in 5 languages":"Translate";
   $("#anIn").placeholder=m==="analyse"?"e.g. ḏd mdw: hꜣ Wnjs, n šm.n.k js mt.tj":"Write in German, English, Arabic, Chinese or Khmer, e.g. The king gave the temple to the gods.";}
@@ -1912,8 +1939,16 @@ Then analyse your composition exactly like an epigraphic text:
 Reply with ONLY one JSON object:
 {"title":"","source":{"language":"","script":"","text":"","transliteration":"","words":[{"w":"","t":"","g":""}],"literal":"","free":"","notes":[""]},"targets":{"de":{"text":"","transliteration":"","words":[{"w":"","t":"","g":""}],"notes":[""]},"en":{…},"ar":{…},"zh":{…},"km":{…}},"compare":[{"feature":"","src":"","de":"","en":"","ar":"","zh":"","km":""}],"uncertain":""}`;
 }
+function renderDict(text){
+  const ids=lexFind(text);const el=$("#anDict");
+  if(!ids.length){el.innerHTML='<p class="small-note">Offline dictionary: no matching words in the Lexicon.</p>';return}
+  el.innerHTML=`<h3>Offline dictionary</h3><p class="small-note">Words from the Lexicon whose meaning matches your text. These work without internet; a full sentence translation needs Claude.</p>`+ids.map(i=>lexCard(LEX[i],i)).join("");
+}
+$("#anDict").addEventListener("click",e=>{const b=e.target.closest("[data-lx]");if(!b)return;const x=LEX[+b.dataset.lx];
+  if(b.dataset.a==="pal"){showTab("pallava");palSetFromText(latinToGrantha(lexWord(x).toLowerCase()),true)}else if(b.dataset.a==="km")speak(x.m.km,"km");else sendToAnalyse(x.cat==="ta"?x.script:x.tr,x.cat.startsWith("sa")?"Sanskrit (as in Pallava and early Southeast Asian inscriptions)":"Old or Middle Egyptian (transliteration or hieroglyphs)")});
 async function runCompose(text,tk){
   text=(text||"").trim();if(!text){toast("Enter some text first.");return}
+  renderDict(text);
   $("#anOut").innerHTML="";$("#anKeyBox").hidden=true;
   anCtl=new AbortController();$("#anGo").disabled=true;$("#anStop").hidden=false;
   $("#anStatus").textContent="Composing and analysing… this can take one to two minutes.";
@@ -1924,7 +1959,7 @@ async function runCompose(text,tk){
     renderAnalysis(r,$("#anOut"));
     const box=document.createElement("div");box.className="compose-head";
     const lat=(r&&r.source&&r.source.transliteration)||"";
-    if(tk==="sa"){box.innerHTML=`<div class="small-note">In Pallava script</div><div class="pal compose-script">${esc(latinToGrantha(lat.toLowerCase()))}</div><div class="row-actions"><button class="btn primary" id="cmpPal">Open in Pallava writer</button></div>`}
+    if(tk==="sa"){box.innerHTML=`<div class="small-note">In Pallava script</div><div class="compose-script pl-line">${palHTML(latinToGrantha(lat.toLowerCase()))}</div><div class="row-actions"><button class="btn primary" id="cmpPal">Open in Pallava writer</button></div>`}
     else{const hg=(r&&r.source&&r.source.text)||"";const alpha=egConvert(lat).map(p=>p.signs).join(" ");
       box.innerHTML=`<div class="small-note">${hg?"In hieroglyphs":"Hieroglyphs (lexicon and alphabetic spelling)"}</div><div class="eg compose-script">${esc(hg||alpha)}</div><div class="row-actions"><button class="btn primary" id="cmpHg">Open in hieroglyph writer</button></div>`}
     const card=$("#anOut").querySelector(".an-card");if(card)card.insertBefore(box,card.children[2]||null);
@@ -1937,6 +1972,86 @@ async function runCompose(text,tk){
   }finally{$("#anGo").disabled=false;$("#anStop").hidden=true}
 }
 $("#anGo").onclick=()=>anMode==="analyse"?runAnalyse($("#anIn").value,$("#anLang").value):runCompose($("#anIn").value,$("#anTarget").value);
+
+// ===== CLEAN PALLAVA RENDERING (no mixed fonts) =====
+function palHTML(g){return String(g||"").split(/(\s+)/).map(w=>/^\s+$/.test(w)?(w.includes("\n")?"<br>":" "):(w?`<span class="pw">${palWordHTML(w)}</span>`:"")).join("")}
+function palWordHTML(g){
+  const cs=[...String(g||"")];let out="";
+  for(let i=0;i<cs.length;i++){
+    const ch=cs[i],cp=ch.codePointAt(0);
+    const isCons=!!R_CONS[cp]||(PALT[ch]&&PALT[ch]!=="a");
+    if(isCons){
+      let glyph=PFONT.includes(cp)?`<span class="pal">${esc(ch)}</span>`:`<span class="pl-miss">${esc((R_CONS[cp]||PALT[ch]||"?"))}</span>`;
+      const nx=cs[i+1]?cs[i+1].codePointAt(0):0;let sup="",dead=false;
+      if(R_SIGN[nx]){sup=R_SIGN[nx];i++}else if(nx===VIR){dead=true;i++}
+      let tail="";
+      while(cs[i+1]&&(cs[i+1].codePointAt(0)===ANU||cs[i+1].codePointAt(0)===VIS)){tail+=cs[i+1].codePointAt(0)===ANU?"ṃ":"ḥ";i++}
+      out+=`<span class="syl${dead?" dead":""}">${glyph}${(sup||tail)?`<sup class="vs">${esc(sup+tail)}</sup>`:""}</span>`;
+      continue;
+    }
+    if(R_IND[cp]||PALT[ch]==="a"){
+      let tail="";while(cs[i+1]&&(cs[i+1].codePointAt(0)===ANU||cs[i+1].codePointAt(0)===VIS)){tail+=cs[i+1].codePointAt(0)===ANU?"ṃ":"ḥ";i++}
+      out+=`<span class="syl">${PFONT.includes(cp)||PALT[ch]?`<span class="pal">${esc(ch)}</span>`:`<span class="pl-miss">${esc(R_IND[cp])}</span>`}${tail?`<sup class="vs">${tail}</sup>`:""}</span>`;continue;
+    }
+    if(cp===ANU||cp===VIS){out+=`<sup class="vs">${cp===ANU?"ṃ":"ḥ"}</sup>`;continue}
+    if(R_SIGN[cp]||cp===VIR)continue;
+    out+=ch==="\n"?"<br>":esc(ch);
+  }
+  return out;
+}
+
+// ===== SCRIPT CONVERTERS INTO PALLAVA (offline, letter-by-letter) =====
+const DEVA_CONS={"क":"k","ख":"kh","ग":"g","घ":"gh","ङ":"ṅ","च":"c","छ":"ch","ज":"j","झ":"jh","ञ":"ñ","ट":"ṭ","ठ":"ṭh","ड":"ḍ","ढ":"ḍh","ण":"ṇ","त":"t","थ":"th","द":"d","ध":"dh","न":"n","प":"p","फ":"ph","ब":"b","भ":"bh","म":"m","य":"y","र":"r","ल":"l","ळ":"ḷ","व":"v","श":"ś","ष":"ṣ","स":"s","ह":"h"};
+const DEVA_IND={"अ":"a","आ":"ā","इ":"i","ई":"ī","उ":"u","ऊ":"ū","ऋ":"ṛ","ए":"e","ऐ":"ai","ओ":"o","औ":"au"};
+const DEVA_SIGN={"ा":"ā","ि":"i","ी":"ī","ु":"u","ू":"ū","ृ":"ṛ","े":"e","ै":"ai","ो":"o","ौ":"au"};
+function devaToGrantha(s){let o="";const cs=[...s];
+  for(let i=0;i<cs.length;i++){const c=cs[i];
+    if(DEVA_CONS[c]){o+=String.fromCodePoint(G_CONS[DEVA_CONS[c]]);const n=cs[i+1];
+      if(n==="़"){i++}
+      const n2=cs[i+1];if(DEVA_SIGN[n2]){o+=String.fromCodePoint(G_SIGN[DEVA_SIGN[n2]]);i++}else if(n2==="्"){o+=String.fromCodePoint(VIR);i++}continue}
+    if(DEVA_IND[c]){o+=String.fromCodePoint(G_IND[DEVA_IND[c]]);continue}
+    if(c==="ं"||c==="ँ"){o+=String.fromCodePoint(ANU);continue}if(c==="ः"){o+=String.fromCodePoint(VIS);continue}
+    if(c==="।"||c==="॥"){o+=c;continue}
+    const d="०१२३४५६७८९".indexOf(c);if(d>=0){o+=String(d);continue}
+    o+=c}
+  return o}
+const KH_CONS={};LN.forEach(r=>{KH_CONS[String.fromCodePoint(r[3])]=r[0]});
+const KH_SIGN={"ា":"ā","ិ":"i","ី":"ī","ុ":"u","ូ":"ū","េ":"e","ៃ":"ai","ោ":"o","ៅ":"au","ួ":"u","ែ":"e"};
+const KH_APPROX=new Set(["ួ","ែ","ឹ","ឺ","ើ","ឿ","ៀ"]);
+const KH_IND={"ឥ":"i","ឦ":"ī","ឧ":"u","ឩ":"ū","ឫ":"ṛ","ឯ":"e","ឰ":"ai","ឱ":"o","ឲ":"o","ឳ":"au"};
+let khApprox=false;
+function khmerToGrantha(s){let o="";khApprox=false;const cs=[...s];
+  for(let i=0;i<cs.length;i++){const c=cs[i];
+    if(KH_APPROX.has(c))khApprox=true;
+    if(c==="អ"){const n=cs[i+1];if(KH_SIGN[n]&&G_IND[KH_SIGN[n]]){o+=String.fromCodePoint(G_IND[KH_SIGN[n]]);i++}else o+=String.fromCodePoint(G_IND.a);continue}
+    if(KH_CONS[c]&&KH_CONS[c]!=="a"){const lat=KH_CONS[c].replace(/a$/,"");
+      let j=i+1;while(cs[j]&&/[\u17C9-\u17D0]/.test(cs[j])){if(cs[j]==="៌"){o+=String.fromCodePoint(G_CONS.r)+String.fromCodePoint(VIR)}j++}
+      o+=String.fromCodePoint(G_CONS[lat]);
+      while(cs[i+1]&&/[\u17C9\u17CA\u17CB\u17CD\u17CE\u17CF\u17D0\u17CC]/.test(cs[i+1])){i++}
+      const n=cs[i+1];if(n==="្"){o+=String.fromCodePoint(VIR);i++}else if(KH_SIGN[n]){if(KH_APPROX.has(n))khApprox=true;if(KH_SIGN[n]!=="a")o+=String.fromCodePoint(G_SIGN[KH_SIGN[n]]);i++}else if(n&&/[\u17B9-\u17C0]/.test(n)){khApprox=true;i++}
+      continue}
+    if(KH_IND[c]){o+=String.fromCodePoint(G_IND[KH_IND[c]]);continue}
+    if(c==="ំ"){o+=String.fromCodePoint(ANU);continue}if(c==="ះ"){o+=String.fromCodePoint(VIS);continue}
+    if(c==="។"){o+="।";continue}if(c==="៕"){o+="॥";continue}
+    const d="០១២៣៤៥៦៧៨៩".indexOf(c);if(d>=0){o+=String(d);continue}
+    if(/[\u17C9-\u17D3\u17DD]/.test(c))continue;
+    o+=c}
+  return o}
+
+// ===== OFFLINE DICTIONARY (meanings -> ancient words) =====
+function lexFind(text){
+  const t=String(text||"").toLowerCase();if(!t.trim())return[];
+  const toks=new Set(t.split(/[\s,.;:!?()"'“”،؟。，、！？។]+/).filter(w=>w.length>1));
+  const stop=new Set(["the","a","an","to","of","and","der","die","das","den","dem","ein","eine","und","zu","in","is","ist","ich","you","he","she","it","i"]);
+  const hits=[];
+  LEX.forEach((e,i)=>{let score=0;
+    for(const [k,v] of Object.entries(e.m)){
+      const gl=String(v).toLowerCase();
+      if(k==="zh"||k==="km"){gl.split(/[、，,;；()（）\/\s]+/).filter(x=>x.length>=1).forEach(x=>{if(x.length>=(k==="zh"?2:2)&&t.includes(x))score+=2})}
+      else gl.split(/[\s,;()\/'"!?.]+/).filter(x=>x.length>1&&!stop.has(x)).forEach(x=>{if(toks.has(x))score+=2})}
+    if(score)hits.push([score,i])});
+  hits.sort((a,b)=>b[0]-a[0]);return hits.slice(0,12).map(h=>h[1]);
+}
 
 // theme
 function applyTheme(t){if(t)document.documentElement.setAttribute("data-theme",t);else document.documentElement.removeAttribute("data-theme")}

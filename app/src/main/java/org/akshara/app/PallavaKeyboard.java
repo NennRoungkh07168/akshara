@@ -89,7 +89,7 @@ public class PallavaKeyboard extends InputMethodService {
     public void onCreate() {
         super.onCreate();
         try {
-            pallava = Typeface.createFromAsset(getAssets(), "www/AksharaPallava.ttf");
+            pallava = Typeface.createFromAsset(getAssets(), "www/AkharaahKhama-V1.01.ttf");
         } catch (Exception e) {
             pallava = Typeface.DEFAULT;
         }
